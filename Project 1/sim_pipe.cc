@@ -21,7 +21,7 @@ sim_pipe::sim_pipe(unsigned mem_size, unsigned mem_latency)
 	data_memory = new int[mem_size];
 	for (unsigned i = 0; i<mem_size; i++)
 	{
-		data_memory[i] = 0x0;
+		data_memory[i] = 0xFF;
 	}
 	data_memory_size = mem_size;
 	eop = false;
@@ -450,7 +450,11 @@ void sim_pipe::print_memory(unsigned start_address, unsigned end_address){
 
 void sim_pipe::write_memory(unsigned address, unsigned value)
 {
-	data_memory[address] = value;
+	data_memory[address + 0] = value & 0xFF;
+	data_memory[address + 1] = (value & 0xFF00) >> 8;
+	data_memory[address + 2] = (value & 0xFF0000) >> 16;
+	data_memory[address + 3] = (value & 0xFF000000) >> 24;
+	//data_memory[address] = value;
 }
 
 void sim_pipe::print_registers(){
@@ -712,12 +716,33 @@ void sim_pipe::memory()//load, store or branch
 	
 	if (opcode == LW)
 	{
-		ex_mem_pipe[LMD] = data_memory[ex_mem_pipe[ALU_OUTPUT]];
+		unsigned value = 0;
+		value += data_memory[ex_mem_pipe[ALU_OUTPUT] + 3];
+		value = value << 8;
+		value += data_memory[ex_mem_pipe[ALU_OUTPUT] + 2];
+		value = value << 8;
+		value += data_memory[ex_mem_pipe[ALU_OUTPUT] + 1];
+		value = value << 8;
+		value += data_memory[ex_mem_pipe[ALU_OUTPUT] + 0];
+
+		ex_mem_pipe[LMD] = value;
 		gp_reg[mem_wb_pipe[B]] = mem_wb_pipe[LMD];
 	}
 	else if (opcode == SW)
 	{
-		data_memory[ex_mem_pipe[ALU_OUTPUT]] = gp_reg[ex_mem_pipe[B]];
+		//if (gp_reg[ex_mem_pipe[B]] > 0xFF)
+		{
+			int data = gp_reg[ex_mem_pipe[B]];
+			data_memory[ex_mem_pipe[ALU_OUTPUT] + 0] = data & 0xFF;
+			data_memory[ex_mem_pipe[ALU_OUTPUT] + 1] = (data & 0xFF00) >> 8;
+			data_memory[ex_mem_pipe[ALU_OUTPUT] + 2] = (data & 0xFF0000) >> 16;
+			data_memory[ex_mem_pipe[ALU_OUTPUT] + 3] = (data & 0xFF000000) >> 24;
+		}
+		//else
+		{
+		//	data_memory[ex_mem_pipe[ALU_OUTPUT]] = gp_reg[ex_mem_pipe[B]];
+		}
+		
 	}
 	for (int i = 0; i < NUM_SP_REGISTERS; i++)
 	{
@@ -759,6 +784,7 @@ unsigned sim_pipe::get_register_value(std::string str)
 }
 
 unsigned sim_pipe::get_first_letter(std::string str, unsigned start)
+
 {
 	unsigned index = start;
 	unsigned i;
